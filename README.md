@@ -1,8 +1,14 @@
-# CATIA 3DX Macro Pad
+# CatPad — CATIA 3DX Macro Pad
+
+by Aditya Yerra
 
 A small always-on-top control pad that sits outside CATIA 3DEXPERIENCE and
-drives the running session over COM. Click a button on the pad, the macro
+drives the running session over COM. Click a card on the pad, the macro
 runs on whatever you have selected in the CATIA tree.
+
+The pad is a frameless macOS-style panel (pywebview + WebView2): drag it
+by its top bar, yellow dot minimizes, red dot closes, hover a card for a
+tooltip.
 
 ## Macros
 
@@ -46,14 +52,16 @@ The pad shows 8 slots; unused ones appear as dimmed `+` placeholders
 waiting for future macros.
 
 1. Add a module under `catia_pad/macros/` exposing `run(log) -> str`.
-2. Append `("Button label", your_module.run)` to `MACROS` in
+2. Append an entry (key, icon, label, tip, fn) to `MACROS` in
    `macro_pad.py` — it fills the next free slot (the grid grows past 8
-   automatically if needed).
+   automatically if needed). New icon? Add an SVG to `ICONS` in
+   `ui/index.html`.
 
 ## Layout
 
 ```
-macro_pad.py              entry point / tkinter pad UI
+macro_pad.py              entry point / pywebview shell + JS bridge
+ui/index.html             the pad UI (HTML/CSS/JS, macOS styling)
 catia_pad/connection.py   attach to the running session (pywin32)
 catia_pad/palette.py      hierarchical muted color math
 catia_pad/macros/         one module per button

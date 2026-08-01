@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CatPad</title>
+<style>
+  :root {
+    --ink: #000000;
+    --ink-3: #6E6E73;
+    --line: rgba(0, 0, 0, .14);
+    --line-strong: rgba(0, 0, 0, .26);
+    --card: #ffffff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: "Segoe UI Variable Display", "Segoe UI Variable Text",
+                 "Segoe UI", -apple-system, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, #FBFBFD 0%, #EFEFF3 100%);
+    display: flex; flex-direction: column;
+    cursor: default;
+  }
+
+  /* ---- header ---- */
+  header {
+    display: flex; align-items: center;
+    padding: 12px 14px 8px 16px;
+    animation: rise .3s ease both;
+  }
+  .drag { flex: 1; display: flex; align-items: center; height: 24px; }
+  .title { font-size: 13px; font-weight: 600; letter-spacing: -.1px; }
+  .dots { display: flex; gap: 8px; padding-left: 10px; }
+  .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: .5px solid rgba(0, 0, 0, .15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; color: rgba(0, 0, 0, 0);
+    cursor: pointer; transition: color .1s;
+  }
+  .dot.min   { background: #FEBC2E; }
+  .dot.close { background: #FF5F57; }
+  .dots:hover .dot.min   { color: #985712; }
+  .dots:hover .dot.close { color: #730E12; }
+  .dot:active { filter: brightness(.85); }
+
+  /* ---- macro grid ---- */
+  main { flex: 1; padding: 4px 14px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, .04), 0 4px 14px rgba(0, 0, 0, .06),
+                inset 0 1px 0 rgba(255, 255, 255, .9);
+    height: 96px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    cursor: pointer;
+    transition: transform .14s cubic-bezier(.2, .7, .3, 1.2),
+                border-color .14s, box-shadow .14s;
+    opacity: 0; animation: rise .34s ease both;
+  }
+  .card:hover {
+    border-color: var(--line-strong);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, .05), 0 8px 22px rgba(0, 0, 0, .10),
+                inset 0 1px 0 rgba(255, 255, 255, .9);
+    transform: translateY(-1px);
+  }
+  .card:active { transform: scale(.965); }
+  .card svg { width: 27px; height: 27px; stroke: var(--ink); }
+  .card .label {
+    font-size: 12.5px; font-weight: 590; letter-spacing: -.1px;
+    text-align: center; line-height: 1.25; color: var(--ink);
+  }
+  .slot {
+    border: 1.5px dashed rgba(0, 0, 0, .17);
+    border-radius: 14px; height: 96px;
+    background: rgba(255, 255, 255, .38);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px; font-weight: 300; color: rgba(0, 0, 0, .32);
+    opacity: 0; animation: rise .34s ease both;
+  }
+  body.busy .card { pointer-events: none; }
+  body.busy .card svg, body.busy .card .label { opacity: .35; }
+
+  /* ---- status + footer ---- */
+  #statusRow {
+    display: flex; align-items: baseline; gap: 6px;
+    padding: 10px 18px 0; min-height: 34px;
+  }
+  #status { font-size: 12px; line-height: 1.35; color: var(--ink); }
+  #working { display: none; }
+  body.busy #working { display: inline-flex; gap: 2px; }
+  #working i {
+    width: 3px; height: 3px; border-radius: 50%; background: var(--ink);
+    animation: pulse 1s infinite;
+  }
+  #working i:nth-child(2) { animation-delay: .15s; }
+  #working i:nth-child(3) { animation-delay: .3s; }
+  footer {
+    text-align: center; font-size: 10.5px; color: var(--ink-3);
+    padding: 8px 0 10px; letter-spacing: .1px;
+  }
+
+  /* ---- tooltip ---- */
+  #tip {
+    position: fixed; z-index: 10; max-width: 224px;
+    background: rgba(247, 247, 248, .98);
+    border: 1px solid rgba(0, 0, 0, .18);
+    border-radius: 6px; padding: 6px 9px;
+    font-size: 11.5px; line-height: 1.4; color: var(--ink);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .16);
+    opacity: 0; pointer-events: none; transition: opacity .12s;
+  }
+  #tip.show { opacity: 1; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); }
+                    to { opacity: 1; transform: none; } }
+  @keyframes pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+</style>
+</head>
+<body>
+  <header>
+    <div class="drag pywebview-drag-region"><span class="title">CatPad</span></div>
+    <div class="dots">
+      <span class="dot min" id="btnMin">–</span>
+      <span class="dot close" id="btnClose">✕</span>
+    </div>
+  </header>
+
+  <main><div class="grid" id="grid"></div></main>
+
+  <div id="statusRow">
+    <span id="status">Ready — select a node in CATIA, then tap a card.</span>
+    <span id="working"><i></i><i></i><i></i></span>
+  </div>
+  <footer id="footer"></footer>
+  <div id="tip"></div>
+
+<script>
+  const ICONS = {
+    palette: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M12 22a10 10 0 1 1 10-10c0 2-1.5 3.5-3.5 3.5H16a2 2 0 0 0-2 2c0 ' +
+      '.6.2 1 .5 1.4.3.5.5.9.5 1.6a1.9 1.9 0 0 1-2 1.5Z"/>' +
+      '<circle cx="7.5" cy="11.5" r=".7" fill="currentColor"/>' +
+      '<circle cx="10.5" cy="7" r=".7" fill="currentColor"/>' +
+      '<circle cx="15" cy="7.5" r=".7" fill="currentColor"/>' +
+      '<circle cx="17.5" cy="11.5" r=".7" fill="currentColor"/></svg>',
+  };
+  const SLOT_TIP = 'Free slot — a future macro lands here.';
+
+  const tip = document.getElementById('tip');
+  let tipTimer = null;
+  function tipBind(el, text) {
+    el.addEventListener('mouseenter', () => {
+      tipTimer = setTimeout(() => {
+        tip.textContent = text;
+        tip.classList.add('show');
+        const r = el.getBoundingClientRect(), tr = tip.getBoundingClientRect();
+        let x = r.left + r.width / 2 - tr.width / 2;
+        x = Math.max(6, Math.min(x, innerWidth - tr.width - 6));
+        let y = r.bottom + 7;
+        if (y + tr.height > innerHeight - 6) y = r.top - tr.height - 7;
+        tip.style.left = x + 'px'; tip.style.top = y + 'px';
+      }, 420);
+    });
+    ['mouseleave', 'mousedown'].forEach(ev =>
+      el.addEventListener(ev, () => { clearTimeout(tipTimer); tip.classList.remove('show'); }));
+  }
+
+  window.CatPad = {
+    setStatus(text) { document.getElementById('status').textContent = text; },
+    setBusy(on) { document.body.classList.toggle('busy', on); },
+  };
+
+  function render(meta) {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    const total = Math.max(meta.slots, meta.macros.length);
+    for (let i = 0; i < total; i++) {
+      const m = meta.macros[i];
+      let el;
+      if (m) {
+        el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML = (ICONS[m.icon] || '') +
+          '<div class="label">' + m.label + '</div>';
+        el.addEventListener('click', () => pywebview.api.run_macro(m.key));
+        tipBind(el, m.tip);
+      } else {
+        el = document.createElement('div');
+        el.className = 'slot';
+        el.textContent = '+';
+        tipBind(el, SLOT_TIP);
+      }
+      el.style.animationDelay = (60 + i * 45) + 'ms';
+      grid.appendChild(el);
+    }
+    document.getElementById('footer').textContent =
+      'CatPad · v' + meta.version + ' · by ' + meta.author;
+  }
+
+  document.getElementById('btnMin').addEventListener('click', () => pywebview.api.minimize());
+  document.getElementById('btnClose').addEventListener('click', () => pywebview.api.close());
+
+  window.addEventListener('pywebviewready', async () => {
+    render(await pywebview.api.get_meta());
+  });
+</script>
+</body>
+</html>
