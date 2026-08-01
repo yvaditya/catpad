@@ -6,6 +6,8 @@ import tkinter as tk
 from catia_pad.macros import color_bodies
 
 # (button label, callable taking a log(str) callback, returning a summary)
+# Append here — the grid keeps TOTAL_SLOTS positions, unfilled ones show
+# as reserved slots.
 MACROS = [
     ("Color by\nHierarchy", color_bodies.run),
 ]
@@ -15,7 +17,10 @@ BTN_BG = "#3a4048"
 BTN_ACTIVE = "#4a525c"
 FG = "#e8e4da"
 STATUS_FG = "#a8b0a0"
+SLOT_BG = "#2b2f35"
+SLOT_FG = "#565d66"
 COLUMNS = 2
+TOTAL_SLOTS = 8
 
 
 def main():
@@ -49,15 +54,24 @@ def main():
 
     grid = tk.Frame(root, bg=BG)
     grid.pack()
-    for i, (label, fn) in enumerate(MACROS):
-        btn = tk.Button(
-            grid, text=label, width=12, height=3,
-            bg=BTN_BG, fg=FG, activebackground=BTN_ACTIVE, activeforeground=FG,
-            relief="flat", font=("Segoe UI", 10, "bold"), cursor="hand2",
-        )
-        btn.config(command=lambda b=btn, f=fn: launch(b, f))
+    for i in range(max(TOTAL_SLOTS, len(MACROS))):
+        if i < len(MACROS):
+            label, fn = MACROS[i]
+            btn = tk.Button(
+                grid, text=label, width=12, height=3,
+                bg=BTN_BG, fg=FG, activebackground=BTN_ACTIVE,
+                activeforeground=FG, relief="flat",
+                font=("Segoe UI", 10, "bold"), cursor="hand2",
+            )
+            btn.config(command=lambda b=btn, f=fn: launch(b, f))
+            buttons.append(btn)
+        else:
+            btn = tk.Button(
+                grid, text="+", width=12, height=3, state="disabled",
+                bg=SLOT_BG, disabledforeground=SLOT_FG, relief="flat",
+                font=("Segoe UI", 12),
+            )
         btn.grid(row=i // COLUMNS, column=i % COLUMNS, padx=5, pady=5)
-        buttons.append(btn)
 
     tk.Label(
         root, textvariable=status, bg=BG, fg=STATUS_FG,

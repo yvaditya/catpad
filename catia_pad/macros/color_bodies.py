@@ -13,6 +13,7 @@ from ..connection import connect, get_selection, get_active_root, set_refresh
 MAX_DEPTH = 8
 
 HIDDEN = 1  # catVisPropertyNoShowAttr
+DESIGN_MODE = 1  # CatWorkModeType.DESIGN_MODE — fully loads component geometry
 
 
 def _items(node, collection):
@@ -38,7 +39,16 @@ def _part_of(product):
     return None
 
 
-def _tagged_children(node):
+def _ensure_loaded(node):
+    """Ask CATIA to fully load a lightweight/visualization-mode component."""
+    try:
+        node.ApplyWorkMode(DESIGN_MODE)
+        return True
+    except Exception:
+        return False
+
+
+def _enumerate(node):
     """Children as (object, is_leaf) pairs.
 
     Sub-products and geosets recurse; bodies and individual shapes are
@@ -55,6 +65,17 @@ def _tagged_children(node):
     kids += [(b, True) for b in bodies]
     kids += [(g, False) for g in geosets]
     kids += [(s, True) for s in _items(node, "HybridShapes")]
+    return kids
+
+
+def _tagged_children(node, stats=None):
+    """Enumerate children; if a component looks empty because it isn't
+    loaded, load it and enumerate again."""
+    kids = _enumerate(node)
+    if not kids and _ensure_loaded(node):
+        if stats is not None:
+            stats["loaded"] += 1
+        kids = _enumerate(node)
     return kids
 
 
@@ -89,7 +110,7 @@ def _paint_level(sel, kids, hue_center, window, depth, stats):
     leaf_i = 0
     for i, (obj, is_leaf) in enumerate(kids):
         hue = palette.sibling_hue(hue_center, i, n, window)
-        sub = None if is_leaf else _tagged_children(obj)
+        sub = None if is_leaf else _tagged_children(obj, stats)
         if sub and depth < MAX_DEPTH:
             _paint_level(sel, sub, hue, window * palette.SHRINK, depth + 1, stats)
         else:
@@ -129,22 +150,26 @@ def run(log):
             if root is None:
                 return "No selection and no active model found."
             roots = [root]
-        log(f"Coloring under {scope}…")
+        stats = {"colored": 0, "skipped": 0, "loaded": 0}
 
+        log(f"Loading unloaded components under {scope}…")
+        for root in roots:
+            _ensure_loaded(root)
+
+        log(f"Coloring under {scope}…")
         top = []
         for root in roots:
-            kids = _tagged_children(root)
+            kids = _tagged_children(root, stats)
             top += kids if kids else [(root, True)]
         if not top:
             return "Found nothing colorable under the selection."
 
-        stats = {"colored": 0, "skipped": 0}
         set_refresh(catia, False)
         try:
             leaf_i = 0
             for i, (obj, is_leaf) in enumerate(top):
                 hue = palette.top_hue(i)
-                sub = None if is_leaf else _tagged_children(obj)
+                sub = None if is_leaf else _tagged_children(obj, stats)
                 if sub:
                     _paint_level(sel, sub, hue, palette.TOP_WINDOW, 1, stats)
                 else:
@@ -157,6 +182,8 @@ def run(log):
             set_refresh(catia, True)
 
         msg = f"Colored {stats['colored']} item(s) under {scope}."
+        if stats["loaded"]:
+            msg += f" Loaded {stats['loaded']} component(s) on the fly."
         if stats["skipped"]:
             msg += f" Skipped {stats['skipped']} (hidden or not colorable)."
         return msg

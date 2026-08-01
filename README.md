@@ -18,8 +18,9 @@ muted, easy-on-the-eyes color, assigned **logically by tree structure**:
 - Bodies inside the same geoset share one hue family and differ mainly by
   saturation/lightness.
 
-Hidden items are skipped. Components the macro can't open up are painted
-whole with one color.
+Hidden items are skipped. Components opened lightweight (visualization
+mode) are switched to fully loaded (design mode) first, then colored.
+Components the macro still can't open up are painted whole with one color.
 
 ## Setup
 
@@ -41,9 +42,13 @@ debugging):
 
 ## Adding a macro
 
+The pad shows 8 slots; unused ones appear as dimmed `+` placeholders
+waiting for future macros.
+
 1. Add a module under `catia_pad/macros/` exposing `run(log) -> str`.
 2. Append `("Button label", your_module.run)` to `MACROS` in
-   `macro_pad.py`. The grid lays itself out.
+   `macro_pad.py` — it fills the next free slot (the grid grows past 8
+   automatically if needed).
 
 ## Layout
 
