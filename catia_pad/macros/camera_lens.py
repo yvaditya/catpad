@@ -8,11 +8,11 @@ import pythoncom
 from ..connection import connect
 
 OPTIONS = [
-    {"key": "ortho", "label": "Orthographic", "hint": "no perspective"},
-    {"key": "50", "label": "50 mm equivalent", "hint": "natural look"},
-    {"key": "35", "label": "35 mm equivalent", "hint": "gentle wide"},
-    {"key": "24", "label": "24 mm equivalent", "hint": "wide"},
-    {"key": "16", "label": "16 mm equivalent", "hint": "ultra-wide, dramatic"},
+    {"key": "ortho", "label": "Orthographic", "hint": "parallel, no FOV"},
+    {"key": "50", "label": "50 mm equivalent", "hint": "27° — natural"},
+    {"key": "35", "label": "35 mm equivalent", "hint": "38° — gentle wide"},
+    {"key": "24", "label": "24 mm equivalent", "hint": "53° — wide"},
+    {"key": "16", "label": "16 mm equivalent", "hint": "74° — ultra-wide"},
 ]
 
 PARALLEL, PERSPECTIVE = 0, 1  # catProjectionCylindric / catProjectionConic
