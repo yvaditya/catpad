@@ -4,6 +4,7 @@ field of view matches a full-frame photo lens (vertical FOV = 2·atan(12/f),
 import math
 
 import pythoncom
+from win32com.client import VARIANT
 
 from ..connection import connect
 
@@ -15,7 +16,42 @@ OPTIONS = [
     {"key": "16", "label": "16 mm equivalent", "hint": "74° — ultra-wide"},
 ]
 
-PARALLEL, PERSPECTIVE = 0, 1  # catProjectionCylindric / catProjectionConic
+# CatProjectionMode: conic (perspective) = 0, cylindric (parallel) = 1 —
+# confirmed live: sending 0 produced perspective, 1 produced parallel.
+PERSPECTIVE, PARALLEL = 0, 1
+
+
+def _triplet(viewpoint, getter):
+    arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8 | pythoncom.VT_BYREF,
+                  [0.0, 0.0, 0.0])
+    getattr(viewpoint, getter)(arr)
+    return list(arr.value)
+
+
+def _keep_subject_size(viewpoint, half_new_deg):
+    """Dolly the camera along its sight line so the model keeps its
+    apparent size while the lens (FOV) changes — only meaningful when the
+    view is already perspective."""
+    half_old = math.radians(viewpoint.FieldOfView)
+    half_new = math.radians(half_new_deg)
+    if half_old <= 0 or abs(half_old - half_new) < 1e-9:
+        return False
+    origin = _triplet(viewpoint, "GetOrigin")
+    sight = _triplet(viewpoint, "GetSightDirection")
+    norm = math.sqrt(sum(c * c for c in sight))
+    if norm < 1e-12:
+        return False
+    sight = [c / norm for c in sight]
+    d_old = viewpoint.FocusDistance
+    if d_old <= 0:
+        return False
+    target = [o + s * d_old for o, s in zip(origin, sight)]
+    d_new = d_old * math.tan(half_old) / math.tan(half_new)
+    new_origin = [t - s * d_new for t, s in zip(target, sight)]
+    viewpoint.PutOrigin(
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, new_origin))
+    viewpoint.FocusDistance = d_new
+    return True
 
 
 def run(log, option="ortho"):
@@ -38,6 +74,12 @@ def run(log, option="ortho"):
         else:
             focal = float(option)
             half_fov = math.degrees(math.atan(12.0 / focal))
+            dollied = False
+            try:
+                if viewpoint.ProjectionMode == PERSPECTIVE:
+                    dollied = _keep_subject_size(viewpoint, half_fov)
+            except Exception:
+                dollied = False
             try:
                 viewpoint.ProjectionMode = PERSPECTIVE
                 viewpoint.FieldOfView = half_fov
@@ -45,6 +87,8 @@ def run(log, option="ortho"):
                 return "This view refused the perspective/FOV change."
             msg = (f"{option} mm lens — perspective, "
                    f"~{2 * half_fov:.0f}° vertical field of view.")
+            if dollied:
+                msg += " Camera dollied to keep the model the same size."
         try:
             viewer.Update()
         except Exception:
