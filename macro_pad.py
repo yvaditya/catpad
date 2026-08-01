@@ -1,8 +1,10 @@
 """CatPad — frameless Apple-style macro pad (pywebview + WebView2 shell)
 driving the running 3DEXPERIENCE session. Add a macro to MACROS and, if it
-needs a new icon, an entry in ICONS inside ui/index.html."""
+needs a new icon, an entry in ICONS inside ui/index.html. A macro with an
+"options" list gets a chooser sheet; its run() takes (log, option_key)."""
 import ctypes
 import json
+import sys
 import threading
 import time
 from pathlib import Path
@@ -10,7 +12,7 @@ from pathlib import Path
 import webview
 
 from catia_pad import __author__, __version__
-from catia_pad.macros import color_bodies
+from catia_pad.macros import camera_lens, color_bodies
 
 MACROS = [
     {
@@ -22,11 +24,20 @@ MACROS = [
                 "within a geoset. Lightweight components are loaded first."),
         "fn": color_bodies.run,
     },
+    {
+        "key": "camera_lens",
+        "icon": "camera",
+        "label": "Camera<br>Lens",
+        "tip": ("Pick a lens for the 3D view: orthographic, or 50 / 35 / 24 "
+                "/ 16 mm full-frame perspective equivalents."),
+        "fn": camera_lens.run,
+        "options": camera_lens.OPTIONS,
+        "sheet_title": "Lens for this view",
+    },
 ]
 
 TOTAL_SLOTS = 8
 WIDTH, HEIGHT = 300, 574
-ALPHA = 247  # ~97% opaque — just enough see-through for the glass to read
 
 
 class _AccentPolicy(ctypes.Structure):
@@ -43,7 +54,7 @@ class _CompositionData(ctypes.Structure):
 
 
 def _dress_window(title):
-    """Rounded corners, slight translucency, blur-behind. Best-effort —
+    """Rounded corners + blur behind the transparent panel. Best-effort —
     silently skipped on systems that refuse any given step."""
     try:
         user32 = ctypes.windll.user32
@@ -58,10 +69,6 @@ def _dress_window(title):
         pref = ctypes.c_int(2)  # DWMWCP_ROUND
         ctypes.windll.dwmapi.DwmSetWindowAttribute(
             hwnd, 33, ctypes.byref(pref), 4)
-        GWL_EXSTYLE, WS_EX_LAYERED, LWA_ALPHA = -20, 0x80000, 0x2
-        style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED)
-        user32.SetLayeredWindowAttributes(hwnd, 0, ALPHA, LWA_ALPHA)
         accent = _AccentPolicy()
         accent.AccentState = 3  # ACCENT_ENABLE_BLURBEHIND
         data = _CompositionData(19,  # WCA_ACCENT_POLICY
@@ -70,6 +77,12 @@ def _dress_window(title):
         user32.SetWindowCompositionAttribute(hwnd, ctypes.byref(data))
     except Exception:
         pass
+
+
+def _ui_path():
+    """ui/index.html next to the source, or bundled inside the frozen app."""
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return base / "ui" / "index.html"
 
 
 class Api:
@@ -84,7 +97,9 @@ class Api:
             "version": __version__,
             "author": __author__,
             "slots": TOTAL_SLOTS,
-            "macros": [{k: m[k] for k in ("key", "icon", "label", "tip")}
+            "macros": [{k: m.get(k) for k in
+                        ("key", "icon", "label", "tip", "options",
+                         "sheet_title")}
                        for m in MACROS],
         }
 
@@ -97,14 +112,17 @@ class Api:
     def set_status(self, text):
         self._push(f"CatPad.setStatus({json.dumps(text)})")
 
-    def run_macro(self, key):
+    def run_macro(self, key, option=None):
         macro = next((m for m in MACROS if m["key"] == key), None)
         if macro is None or self._busy:
             return
         self._busy = True
         self._push("CatPad.setBusy(true)")
         try:
-            msg = macro["fn"](self.set_status)
+            if macro.get("options"):
+                msg = macro["fn"](self.set_status, option)
+            else:
+                msg = macro["fn"](self.set_status)
         except Exception as exc:
             msg = f"Error: {exc}"
         finally:
@@ -121,15 +139,14 @@ class Api:
 
 def main():
     api = Api()
-    ui = Path(__file__).resolve().parent / "ui" / "index.html"
     try:
         screen_w = ctypes.windll.user32.GetSystemMetrics(0)
         x = max(screen_w - WIDTH - 40, 0)
     except Exception:
         x = 100
     api.window = webview.create_window(
-        "CatPad", ui.as_uri(), js_api=api,
-        frameless=True, on_top=True, resizable=False,
+        "CatPad", _ui_path().as_uri(), js_api=api,
+        frameless=True, on_top=True, resizable=False, transparent=True,
         width=WIDTH, height=HEIGHT, x=x, y=120,
     )
     threading.Thread(target=_dress_window, args=("CatPad",),

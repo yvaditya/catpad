@@ -9,43 +9,13 @@ import pythoncom
 
 from .. import palette
 from ..connection import connect, get_selection, get_active_root, set_refresh
+from ..tree import (items as _items, part_of as _part_of,
+                    ensure_loaded as _ensure_loaded,
+                    selected_roots as _selected_roots)
 
 MAX_DEPTH = 8
 
 HIDDEN = 1  # catVisPropertyNoShowAttr
-DESIGN_MODE = 1  # CatWorkModeType.DESIGN_MODE — fully loads component geometry
-
-
-def _items(node, collection):
-    try:
-        coll = getattr(node, collection)
-        return [coll.Item(i) for i in range(1, coll.Count + 1)]
-    except Exception:
-        return []
-
-
-def _part_of(product):
-    getters = (
-        lambda p: p.ReferenceProduct.Parent.Part,
-        lambda p: p.Parent.Part,
-    )
-    for get in getters:
-        try:
-            part = get(product)
-            if part is not None:
-                return part
-        except Exception:
-            pass
-    return None
-
-
-def _ensure_loaded(node):
-    """Ask CATIA to fully load a lightweight/visualization-mode component."""
-    try:
-        node.ApplyWorkMode(DESIGN_MODE)
-        return True
-    except Exception:
-        return False
 
 
 def _enumerate(node):
@@ -121,16 +91,6 @@ def _paint_level(sel, kids, hue_center, window, depth, stats):
             else:
                 stats["skipped"] += 1
             leaf_i += 1
-
-
-def _selected_roots(sel):
-    for count_attr, item_attr in (("Count2", "Item2"), ("Count", "Item")):
-        try:
-            get = getattr(sel, item_attr)
-            return [get(i).Value for i in range(1, getattr(sel, count_attr) + 1)]
-        except Exception:
-            continue
-    return []
 
 
 def run(log):

@@ -28,6 +28,13 @@ Hidden items are skipped. Components opened lightweight (visualization
 mode) are switched to fully loaded (design mode) first, then colored.
 Components the macro still can't open up are painted whole with one color.
 
+### Camera Lens
+
+Tap the card, pick a lens in the popup sheet: **Orthographic** (parallel
+projection) or a **50 / 35 / 24 / 16 mm** full-frame equivalent. The
+active 3D view switches projection and field of view to match
+(vertical FOV = 2·atan(12/focal)).
+
 ## Setup
 
 Needs Python 3.11+ on Windows and a running 3DEXPERIENCE native client.
@@ -45,6 +52,12 @@ debugging):
 ```powershell
 .venv\Scripts\python macro_pad.py
 ```
+
+## Standalone app
+
+`build_app.bat` packages everything into a single `dist\CatPad.exe`
+(PyInstaller) that runs on any Windows 11 machine without Python — only
+Microsoft's WebView2 runtime is needed, which ships with Windows 11.
 
 ## Adding a macro
 

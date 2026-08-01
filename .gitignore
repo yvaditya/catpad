@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 palette_preview.html
+build/
+dist/
+*.spec

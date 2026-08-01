@@ -13,11 +13,14 @@
   }
   * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
   html, body { height: 100%; overflow: hidden; }
+  html { background: transparent; }
   body {
     font-family: "Segoe UI Variable Display", "Segoe UI Variable Text",
                  "Segoe UI", -apple-system, sans-serif;
     color: var(--ink);
-    background: linear-gradient(180deg, #FBFBFD 0%, #EFEFF3 100%);
+    /* 40% transparent panel — the desktop shows through, blurred */
+    background: linear-gradient(180deg, rgba(251, 251, 253, .62) 0%,
+                                        rgba(238, 238, 243, .60) 100%);
     display: flex; flex-direction: column;
     cursor: default;
   }
@@ -76,7 +79,7 @@
   .slot {
     border: 1.5px dashed rgba(0, 0, 0, .17);
     border-radius: 14px; height: 96px;
-    background: rgba(255, 255, 255, .38);
+    background: rgba(255, 255, 255, .60);
     display: flex; align-items: center; justify-content: center;
     font-size: 19px; font-weight: 300; color: rgba(0, 0, 0, .32);
     opacity: 0; animation: rise .34s ease both;
@@ -115,6 +118,40 @@
   }
   #tip.show { opacity: 1; }
 
+  /* ---- option sheet ---- */
+  #overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, .18);
+    opacity: 0; pointer-events: none; transition: opacity .15s;
+  }
+  #sheet {
+    position: fixed; left: 12px; right: 12px; bottom: 14px; z-index: 5;
+    background: rgba(255, 255, 255, .98);
+    border: 1px solid rgba(0, 0, 0, .16);
+    border-radius: 14px; padding: 8px;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, .22);
+    opacity: 0; pointer-events: none; transform: translateY(10px);
+    transition: opacity .16s, transform .16s cubic-bezier(.2, .7, .3, 1.1);
+  }
+  body.sheet-open #overlay { opacity: 1; pointer-events: auto; }
+  body.sheet-open #sheet { opacity: 1; pointer-events: auto; transform: none; }
+  #sheetTitle {
+    font-size: 11px; font-weight: 600; color: var(--ink-3);
+    text-transform: uppercase; letter-spacing: .4px; padding: 6px 10px 4px;
+  }
+  .opt {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 9px 10px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; color: var(--ink);
+  }
+  .opt:hover { background: rgba(0, 0, 0, .06); }
+  .opt:active { background: rgba(0, 0, 0, .10); }
+  .opt .hint { font-size: 11px; color: var(--ink-3); }
+  .opt.cancel {
+    justify-content: center; font-weight: 600;
+    border-top: 1px solid rgba(0, 0, 0, .1);
+    border-radius: 0 0 8px 8px; margin-top: 4px;
+  }
+
   @keyframes rise { from { opacity: 0; transform: translateY(6px); }
                     to { opacity: 1; transform: none; } }
   @keyframes pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
@@ -137,6 +174,8 @@
   </div>
   <footer id="footer"></footer>
   <div id="tip"></div>
+  <div id="overlay"></div>
+  <div id="sheet"><div id="sheetTitle"></div><div id="sheetOpts"></div></div>
 
 <script>
   const ICONS = {
@@ -148,6 +187,11 @@
       '<circle cx="10.5" cy="7" r=".7" fill="currentColor"/>' +
       '<circle cx="15" cy="7.5" r=".7" fill="currentColor"/>' +
       '<circle cx="17.5" cy="11.5" r=".7" fill="currentColor"/></svg>',
+    camera: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 ' +
+      '0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>' +
+      '<circle cx="12" cy="13" r="3"/></svg>',
   };
   const SLOT_TIP = 'Free slot — a future macro lands here.';
 
@@ -175,6 +219,31 @@
     setBusy(on) { document.body.classList.toggle('busy', on); },
   };
 
+  function closeSheet() { document.body.classList.remove('sheet-open'); }
+  function openSheet(m) {
+    document.getElementById('sheetTitle').textContent = m.sheet_title || m.label.replace('<br>', ' ');
+    const box = document.getElementById('sheetOpts');
+    box.innerHTML = '';
+    m.options.forEach(o => {
+      const row = document.createElement('div');
+      row.className = 'opt';
+      row.innerHTML = '<span>' + o.label + '</span>' +
+        (o.hint ? '<span class="hint">' + o.hint + '</span>' : '');
+      row.addEventListener('click', () => {
+        closeSheet();
+        pywebview.api.run_macro(m.key, o.key);
+      });
+      box.appendChild(row);
+    });
+    const cancel = document.createElement('div');
+    cancel.className = 'opt cancel';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', closeSheet);
+    box.appendChild(cancel);
+    document.body.classList.add('sheet-open');
+  }
+  document.getElementById('overlay').addEventListener('click', closeSheet);
+
   function render(meta) {
     const grid = document.getElementById('grid');
     grid.innerHTML = '';
@@ -187,7 +256,8 @@
         el.className = 'card';
         el.innerHTML = (ICONS[m.icon] || '') +
           '<div class="label">' + m.label + '</div>';
-        el.addEventListener('click', () => pywebview.api.run_macro(m.key));
+        el.addEventListener('click', () => m.options
+          ? openSheet(m) : pywebview.api.run_macro(m.key));
         tipBind(el, m.tip);
       } else {
         el = document.createElement('div');
