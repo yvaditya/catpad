@@ -25,18 +25,18 @@ SHRINK = 0.4
 # in the same geoset read as one family separated by tone, not hue.
 # All pairs stay in the muted band: no neon, no mud.
 LEAF_TONES = [
-    (0.34, 0.66),
-    (0.42, 0.58),
-    (0.26, 0.72),
-    (0.38, 0.62),
-    (0.30, 0.54),
-    (0.46, 0.68),
+    (0.42, 0.66),
+    (0.50, 0.58),
+    (0.34, 0.72),
+    (0.46, 0.62),
+    (0.38, 0.54),
+    (0.54, 0.68),
 ]
 
 # Every final color is blended slightly toward this warm gray so the whole
 # palette reads as one coordinated family instead of independent colors.
 HARMONY_GRAY = (184, 178, 168)
-HARMONY = 0.12
+HARMONY = 0.09
 
 
 def top_hue(index):
