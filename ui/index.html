@@ -89,11 +89,11 @@
   body.busy .card svg, body.busy .card .label { opacity: .35; }
 
   /* ---- status + footer ---- */
-  #statusRow {
-    display: flex; align-items: baseline; gap: 5px;
-    padding: 7px 12px 0; min-height: 26px;
+  #statusRow { padding: 7px 12px 0; min-height: 26px; }
+  #status {
+    font-size: 10.5px; line-height: 1.35; color: var(--ink);
+    overflow-wrap: anywhere;
   }
-  #status { font-size: 10.5px; line-height: 1.35; color: var(--ink); }
   #working { display: none; }
   body.busy #working { display: inline-flex; gap: 2px; }
   #working i {

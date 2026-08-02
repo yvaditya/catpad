@@ -79,23 +79,6 @@ def _dress_window(title):
         pass
 
 
-def _enable_dpi_awareness():
-    try:
-        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # per-monitor
-    except Exception:
-        try:
-            ctypes.windll.user32.SetProcessDPIAware()
-        except Exception:
-            pass
-
-
-def _dpi_scale():
-    try:
-        return ctypes.windll.user32.GetDpiForSystem() / 96.0
-    except Exception:
-        return 1.0
-
-
 def _ui_path():
     """ui/index.html next to the source, or bundled inside the frozen app."""
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -156,18 +139,17 @@ class Api:
 
 def main():
     api = Api()
-    _enable_dpi_awareness()
-    scale = _dpi_scale()
-    width, height = round(WIDTH * scale), round(HEIGHT * scale)
+    # geometry is in logical units — pywebview applies DPI scaling itself,
+    # so no manual scale math here (doing it double-scales x off-screen)
     try:
         screen_w = ctypes.windll.user32.GetSystemMetrics(0)
-        x = max(screen_w - width - round(40 * scale), 0)
+        x = max(screen_w - WIDTH - 40, 0)
     except Exception:
         x = 100
     api._window = webview.create_window(
         "CatPad", _ui_path().as_uri(), js_api=api,
         frameless=True, on_top=True, resizable=False, transparent=True,
-        width=width, height=height, x=x, y=120,
+        width=WIDTH, height=HEIGHT, x=x, y=120,
     )
     threading.Thread(target=_dress_window, args=("CatPad",),
                      daemon=True).start()
