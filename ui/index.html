@@ -18,9 +18,9 @@
     font-family: "Segoe UI Variable Display", "Segoe UI Variable Text",
                  "Segoe UI", -apple-system, sans-serif;
     color: var(--ink);
-    /* 70% transparent panel — the desktop shows through, blurred */
-    background: linear-gradient(180deg, rgba(251, 251, 253, .32) 0%,
-                                        rgba(238, 238, 243, .30) 100%);
+    /* ~70% transparent panel — the desktop shows through, blurred */
+    background: linear-gradient(180deg, rgba(251, 251, 253, .14) 0%,
+                                        rgba(238, 238, 243, .12) 100%);
     display: flex; flex-direction: column;
     cursor: default;
   }
@@ -48,7 +48,8 @@
   .dot:active { filter: brightness(.85); }
 
   /* ---- macro grid ---- */
-  main { flex: 1; padding: 3px 10px; }
+  /* grid clips before status/footer ever get squeezed */
+  main { flex: 1; min-height: 0; overflow: hidden; padding: 3px 10px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
   .card {
     background: var(--card);
