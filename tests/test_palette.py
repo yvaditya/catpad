@@ -27,6 +27,15 @@ def test_sibling_window_shrinks():
     assert spread1 <= palette.TOP_WINDOW + 1e-6
 
 
+def test_adjacent_siblings_differ_clearly():
+    hues = [palette.sibling_hue(200.0, i, 5, palette.TOP_WINDOW)
+            for i in range(5)]
+    for a, b in zip(hues, hues[1:]):
+        d = min(abs(a - b), 360 - abs(a - b))
+        assert d >= palette.TOP_WINDOW / 4, \
+            f"tree-adjacent geosets too close in hue: {a:.0f} vs {b:.0f}"
+
+
 def test_leaf_rgb_muted_and_distinct():
     seen = set()
     for i in range(6):

@@ -18,7 +18,7 @@ GOLDEN_ANGLE = 137.508
 
 # Total hue spread among siblings one level below a top-level item;
 # each level deeper multiplies the window by SHRINK.
-TOP_WINDOW = 44.0
+TOP_WINDOW = 90.0
 SHRINK = 0.4
 
 # Leaf siblings cycle through these (saturation, lightness) pairs so bodies
@@ -49,10 +49,13 @@ def top_hue(index):
 
 def sibling_hue(center, index, count, window):
     """Spread `count` sibling hues across `window` degrees centered on the
-    parent's hue."""
+    parent's hue. Positions are interleaved (0, mid, 1, mid+1, …) so
+    neighbors in the tree land far apart in hue instead of side by side."""
     if count <= 1:
         return center % 360.0
-    return (center + window * (index / (count - 1) - 0.5)) % 360.0
+    half = (count + 1) // 2
+    pos = (index // 2) + (half if index % 2 else 0)
+    return (center + window * (pos / (count - 1) - 0.5)) % 360.0
 
 
 def _tune(hue, sat, light):

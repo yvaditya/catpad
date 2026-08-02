@@ -21,7 +21,8 @@ with distinct, muted, easy-to-differentiate colors.
   - Top-level items: clearly different muted anchor hues, extended by
     golden-angle steps when the model has more items than the curated 12.
   - Each level deeper: sibling hues confined to a window around the
-    parent hue (44° below top level, ×0.4 per extra level).
+    parent hue (90° below top level, ×0.4 per extra level), with sibling
+    positions interleaved so tree-adjacent geosets sit far apart in hue.
   - Leaves in one container (bodies in a geoset): same hue family,
     separated by cycling saturation/lightness pairs.
   - All colors stay in a muted band (S ≈ 0.24–0.45, L ≈ 0.50–0.68).
