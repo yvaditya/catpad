@@ -106,7 +106,7 @@ class Api:
     """Bridge exposed to the page as window.pywebview.api."""
 
     def __init__(self):
-        self.window = None
+        self._window = None  # private: pywebview must not expose/serialize it
         self._busy = False
 
     def get_meta(self):
@@ -122,7 +122,7 @@ class Api:
 
     def _push(self, js):
         try:
-            self.window.evaluate_js(js)
+            self._window.evaluate_js(js)
         except Exception:
             pass
 
@@ -148,10 +148,10 @@ class Api:
         self.set_status(msg)
 
     def minimize(self):
-        self.window.minimize()
+        self._window.minimize()
 
     def close(self):
-        self.window.destroy()
+        self._window.destroy()
 
 
 def main():
@@ -164,7 +164,7 @@ def main():
         x = max(screen_w - width - round(40 * scale), 0)
     except Exception:
         x = 100
-    api.window = webview.create_window(
+    api._window = webview.create_window(
         "CatPad", _ui_path().as_uri(), js_api=api,
         frameless=True, on_top=True, resizable=False, transparent=True,
         width=width, height=height, x=x, y=120,
