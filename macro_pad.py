@@ -37,7 +37,7 @@ MACROS = [
 ]
 
 TOTAL_SLOTS = 8
-WIDTH, HEIGHT = 300, 574
+WIDTH, HEIGHT = 210, 402
 
 
 class _AccentPolicy(ctypes.Structure):
