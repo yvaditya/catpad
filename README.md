@@ -35,6 +35,20 @@ projection) or a **50 / 35 / 24 / 16 mm** full-frame equivalent. The
 active 3D view switches projection and field of view to match
 (vertical FOV = 2·atan(12/focal)).
 
+### View filters — Lines / Planes / Axes / Points
+
+A double-width card split into four side-by-side toggles. Tap a segment
+to flip that element type's display filter in the 3D view (the options
+under the View Modes chooser) — the model's hide/show state is never
+touched. The segment dims and strikes through while filtered out; tap
+again to restore it. Each segment toggles independently.
+
+The filters have no automation API, so the pad fires the matching UI
+command (`StartCommand`) and tries a few known spellings per type. If
+your release names them differently, the status line says so — look the
+name up with the `c:` Power Input box and put it first in `_COMMANDS`
+inside `catia_pad/macros/toggle_visibility.py`.
+
 ## Setup
 
 Needs Python 3.11+ on Windows and a running 3DEXPERIENCE native client.

@@ -1,7 +1,9 @@
 """CatPad — frameless Apple-style macro pad (pywebview + WebView2 shell)
 driving the running 3DEXPERIENCE session. Add a macro to MACROS and, if it
 needs a new icon, an entry in ICONS inside ui/index.html. A macro with an
-"options" list gets a chooser sheet; its run() takes (log, option_key)."""
+"options" list gets a chooser sheet; one with a "toggles" list renders as
+a double-width card of side-by-side on/off segments. Either way its run()
+takes (log, option_key)."""
 import ctypes
 import json
 import sys
@@ -12,7 +14,7 @@ from pathlib import Path
 import webview
 
 from catia_pad import __author__, __version__
-from catia_pad.macros import camera_lens, color_bodies
+from catia_pad.macros import camera_lens, color_bodies, toggle_visibility
 
 MACROS = [
     {
@@ -33,6 +35,12 @@ MACROS = [
         "fn": camera_lens.run,
         "options": camera_lens.OPTIONS,
         "sheet_title": "Lens for this view",
+    },
+    {
+        "key": "toggle_visibility",
+        "wide": True,
+        "toggles": toggle_visibility.TOGGLES,
+        "fn": toggle_visibility.run,
     },
 ]
 
@@ -99,7 +107,7 @@ class Api:
             "slots": TOTAL_SLOTS,
             "macros": [{k: m.get(k) for k in
                         ("key", "icon", "label", "tip", "options",
-                         "sheet_title")}
+                         "sheet_title", "wide", "toggles")}
                        for m in MACROS],
         }
 
@@ -119,7 +127,7 @@ class Api:
         self._busy = True
         self._push("CatPad.setBusy(true)")
         try:
-            if macro.get("options"):
+            if macro.get("options") or macro.get("toggles"):
                 msg = macro["fn"](self.set_status, option)
             else:
                 msg = macro["fn"](self.set_status)

@@ -10,10 +10,10 @@ from ..connection import connect
 
 OPTIONS = [
     {"key": "ortho", "label": "Orthographic", "hint": "parallel, no FOV"},
-    {"key": "50", "label": "50 mm equivalent", "hint": "27° — natural"},
-    {"key": "35", "label": "35 mm equivalent", "hint": "38° — gentle wide"},
-    {"key": "24", "label": "24 mm equivalent", "hint": "53° — wide"},
-    {"key": "16", "label": "16 mm equivalent", "hint": "74° — ultra-wide"},
+    {"key": "50", "label": "50 mm", "hint": "27° — natural"},
+    {"key": "35", "label": "35 mm", "hint": "38° — gentle wide"},
+    {"key": "24", "label": "24 mm", "hint": "53° — wide"},
+    {"key": "16", "label": "16 mm", "hint": "74° — ultra-wide"},
 ]
 
 # CatProjectionMode: conic (perspective) = 0, cylindric (parallel) = 1 —
