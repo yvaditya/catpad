@@ -1,96 +1,52 @@
-"""Color everything under the selected tree node(s), hierarchically.
+"""One flat, clearly different color per body/geoset, for every visible
+part in the model.
 
-Scope is whatever the user selected in the CATIA tree (falls back to the
-whole active model when nothing is selected). Top-level items get clearly
-different muted hues; each level deeper the sibling hues get closer, and
-bodies inside one geoset differ mainly by saturation/lightness.
+Unlike Color by Hierarchy this never descends inside a geoset and ignores
+the tree structure when picking colors: every body and top-level geoset
+across the whole model gets its own well-spread muted hue (applied with
+inheritance, so everything inside follows), so neighboring bodies never
+share a family.
 """
 import pythoncom
 
 from .. import palette
-from ..connection import connect, get_selection, get_active_root, set_refresh
-from ..tree import (items as _items, part_of as _part_of,
-                    ensure_loaded as _ensure_loaded,
-                    selected_roots as _selected_roots)
-
-MAX_DEPTH = 8
-
-HIDDEN = 1  # catVisPropertyNoShowAttr
+from ..connection import (connect, get_active_root, get_selection,
+                          is_hidden, set_color, set_refresh)
+from ..tree import ensure_loaded, items, part_of, ref_name, sub_products
 
 
-def _enumerate(node):
-    """Children as (object, is_leaf) pairs.
+def _parts(node, found, stats):
+    """Collect leaf products (the parts) under node, loading lightweight
+    components on the way down."""
+    subs = sub_products(node)
+    if not subs and ensure_loaded(node):
+        stats["loaded"] += 1
+        subs = sub_products(node)
+    if subs:
+        for sub in subs:
+            _parts(sub, found, stats)
+    else:
+        found.append(node)
 
-    Sub-products and geosets recurse; bodies and individual shapes are
-    leaves (coloring a body with inheritance covers everything inside it).
-    """
-    kids = [(p, False) for p in _items(node, "Products")]
-    bodies = _items(node, "Bodies")
-    geosets = _items(node, "HybridBodies")
-    if not kids and not bodies and not geosets:
-        part = _part_of(node)
+
+def _units(node):
+    """Bodies and top-level geosets of one part-level node, loading the
+    component first when it looks empty because it isn't loaded."""
+    units = _try_units(node)
+    if not units and ensure_loaded(node):
+        units = _try_units(node)
+    return units
+
+
+def _try_units(node):
+    bodies = items(node, "Bodies")
+    geosets = items(node, "HybridBodies")
+    if not bodies and not geosets:
+        part = part_of(node)
         if part is not None:
-            bodies = _items(part, "Bodies")
-            geosets = _items(part, "HybridBodies")
-    kids += [(b, True) for b in bodies]
-    kids += [(g, False) for g in geosets]
-    kids += [(s, True) for s in _items(node, "HybridShapes")]
-    return kids
-
-
-def _tagged_children(node, stats=None):
-    """Enumerate children; if a component looks empty because it isn't
-    loaded, load it and enumerate again."""
-    kids = _enumerate(node)
-    if not kids and _ensure_loaded(node):
-        if stats is not None:
-            stats["loaded"] += 1
-        kids = _enumerate(node)
-    return kids
-
-
-def _apply_color(sel, obj, rgb):
-    """Color one object (with inheritance) unless it is hidden."""
-    try:
-        sel.Clear()
-        sel.Add(obj)
-        vis = sel.VisProperties
-    except Exception:
-        return False
-    try:
-        if vis.GetShow() == HIDDEN:
-            return False
-    except Exception:
-        pass  # can't query visibility on this session -> color it anyway
-    try:
-        r, g, b = rgb
-        vis.SetRealColor(int(r), int(g), int(b), 1)
-        return True
-    except Exception:
-        return False
-    finally:
-        try:
-            sel.Clear()
-        except Exception:
-            pass
-
-
-def _paint_level(sel, kids, hue_center, window, depth, stats):
-    n = len(kids)
-    leaf_i = 0
-    for i, (obj, is_leaf) in enumerate(kids):
-        hue = palette.sibling_hue(hue_center, i, n, window)
-        sub = None if is_leaf else _tagged_children(obj, stats)
-        if sub and depth < MAX_DEPTH:
-            _paint_level(sel, sub, hue, window * palette.SHRINK, depth + 1, stats)
-        else:
-            # containers we can't see inside get painted whole — one color
-            # per component is still the right look
-            if _apply_color(sel, obj, palette.leaf_rgb(hue, leaf_i)):
-                stats["colored"] += 1
-            else:
-                stats["skipped"] += 1
-            leaf_i += 1
+            bodies = items(part, "Bodies")
+            geosets = items(part, "HybridBodies")
+    return bodies + geosets
 
 
 def run(log):
@@ -102,50 +58,55 @@ def run(log):
             sel = get_selection(catia)
         except Exception:
             return "Nothing is open in CATIA — open a model first."
+        root = get_active_root(catia)
+        if root is None:
+            return "No active model found."
 
-        roots = _selected_roots(sel)
-        scope = f"{len(roots)} selected item(s)" if roots else "active model"
-        if not roots:
-            root = get_active_root(catia)
-            if root is None:
-                return "No selection and no active model found."
-            roots = [root]
-        stats = {"colored": 0, "skipped": 0, "loaded": 0}
+        stats = {"loaded": 0}
+        log("Finding visible parts…")
+        parts = []
+        _parts(root, parts, stats)
+        if not parts:
+            return "Found no parts in the active model."
 
-        log(f"Loading unloaded components under {scope}…")
-        for root in roots:
-            _ensure_loaded(root)
-
-        log(f"Coloring under {scope}…")
-        top = []
-        for root in roots:
-            kids = _tagged_children(root, stats)
-            top += kids if kids else [(root, True)]
-        if not top:
-            return "Found nothing colorable under the selection."
-
+        log(f"Coloring bodies/geosets across {len(parts)} part(s)…")
+        colored = hidden_parts = repeats = 0
+        part_i = 0
+        # one global sequence: hue walks the curated wheel (then golden-angle
+        # steps) while the tone cycles too, so every body lands far from the
+        # previous ones in hue AND in saturation/lightness
+        k = 0
+        seen = set()  # instances of one part share its reference colors
         set_refresh(catia, False)
         try:
-            leaf_i = 0
-            for i, (obj, is_leaf) in enumerate(top):
-                hue = palette.top_hue(i)
-                sub = None if is_leaf else _tagged_children(obj, stats)
-                if sub:
-                    _paint_level(sel, sub, hue, palette.TOP_WINDOW, 1, stats)
-                else:
-                    if _apply_color(sel, obj, palette.leaf_rgb(hue, leaf_i)):
-                        stats["colored"] += 1
-                    else:
-                        stats["skipped"] += 1
-                    leaf_i += 1
+            for node in parts:
+                if is_hidden(sel, node):
+                    hidden_parts += 1
+                    continue
+                key = ref_name(node)
+                if key in seen:
+                    repeats += 1
+                    continue
+                seen.add(key)
+                part_i += 1
+                units = _units(node) or [node]  # nothing inside -> paint whole
+                for unit in units:
+                    if is_hidden(sel, unit):
+                        continue
+                    if set_color(sel, unit,
+                                 palette.leaf_rgb(palette.top_hue(k), k)):
+                        colored += 1
+                        k += 1
         finally:
             set_refresh(catia, True)
 
-        msg = f"Colored {stats['colored']} item(s) under {scope}."
+        msg = f"Colored {colored} body/geoset(s) across {part_i} visible part(s)."
+        if repeats:
+            msg += f" {repeats} repeated instance(s) share their part's colors."
+        if hidden_parts:
+            msg += f" Skipped {hidden_parts} hidden part(s)."
         if stats["loaded"]:
             msg += f" Loaded {stats['loaded']} component(s) on the fly."
-        if stats["skipped"]:
-            msg += f" Skipped {stats['skipped']} (hidden or not colorable)."
         return msg
     finally:
         pythoncom.CoUninitialize()

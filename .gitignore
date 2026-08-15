@@ -5,3 +5,5 @@ palette_preview.html
 build/
 dist/
 *.spec
+
+catia_command_catalog.xlsx

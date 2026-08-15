@@ -44,6 +44,60 @@ def get_active_root(catia):
     return None
 
 
+SHOWN, HIDDEN = 0, 1  # CatVisPropertyShow attribute values
+
+
+def show_state(vis_properties):
+    """Show attribute of the current selection (SHOWN or HIDDEN).
+
+    This 3DX build returns GetShow as a (flags, state) tuple — the state
+    sits last (verified live: hidden items give (0, 1), shown give (0, 0)).
+    Plain ints are passed through for other builds.
+    """
+    raw = vis_properties.GetShow()
+    if isinstance(raw, tuple):
+        raw = raw[-1]
+    return raw
+
+
+def is_hidden(sel, obj):
+    """True when the object itself is flagged hidden. Containers gate
+    their whole subtree: a hidden geoset means nothing inside it shows,
+    whatever the children's own flags say."""
+    try:
+        sel.Clear()
+        sel.Add(obj)
+        return show_state(sel.VisProperties) == HIDDEN
+    except Exception:
+        return False  # can't query -> treat as visible
+
+
+def set_color(sel, obj, rgb):
+    """Color one object (with inheritance), or hand the color back to the
+    parent when rgb is None — SetRealColor's inheritance flag 0 drops the
+    override so the item inherits again."""
+    try:
+        sel.Clear()
+        sel.Add(obj)
+        vis = sel.VisProperties
+    except Exception:
+        return False
+    try:
+        if rgb is None:
+            vis.SetRealColor(0, 0, 0, 0)
+        else:
+            r, g, b = rgb
+            vis.SetRealColor(int(r), int(g), int(b), 1)
+        return True
+    except Exception:
+        return False
+    finally:
+        try:
+            sel.Clear()
+        except Exception:
+            pass
+
+
 def set_refresh(catia, on):
     """Toggle display refresh; ignored on sessions that don't expose it."""
     try:

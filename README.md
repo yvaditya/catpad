@@ -28,6 +28,25 @@ Hidden items are skipped. Components opened lightweight (visualization
 mode) are switched to fully loaded (design mode) first, then colored.
 Components the macro still can't open up are painted whole with one color.
 
+### Color Bodies
+
+Flat coloring for the whole model: every body and top-level geoset across
+all visible parts gets its own clearly different muted color — the hue
+walks the curated wheel (then golden-angle steps) while the tone cycles,
+so neighbors never look alike. Applied with inheritance, so everything
+inside a body/geoset follows. Repeated instances of one part share its
+colors (same part = same color everywhere). Unlike Color by Hierarchy
+the macro never descends inside a geoset, and it always targets all
+visible parts regardless of the selection. Hidden parts, bodies and
+geosets are skipped.
+
+### Reset Colors
+
+Undoes the coloring: walks the whole active model and drops the color
+override on every visible item (products, parts, bodies, geosets,
+shapes), so each falls back to its inherited/default color. Hidden items
+— and everything under a hidden container — are left untouched.
+
 ### Camera Lens
 
 Tap the card, pick a lens in the popup sheet: **Orthographic** (parallel
@@ -35,19 +54,12 @@ projection) or a **50 / 35 / 24 / 16 mm** full-frame equivalent. The
 active 3D view switches projection and field of view to match
 (vertical FOV = 2·atan(12/focal)).
 
-### View filters — Lines / Planes / Axes / Points
+### Std Views
 
-A double-width card split into four side-by-side toggles. Tap a segment
-to flip that element type's display filter in the 3D view (the options
-under the View Modes chooser) — the model's hide/show state is never
-touched. The segment dims and strikes through while filtered out; tap
-again to restore it. Each segment toggles independently.
-
-The filters have no automation API, so the pad fires the matching UI
-command (`StartCommand`) and tries a few known spellings per type. If
-your release names them differently, the status line says so — look the
-name up with the `c:` Power Input box and put it first in `_COMMANDS`
-inside `catia_pad/macros/toggle_visibility.py`.
+Tap the card, pick an orientation: **Front / Back / Left / Right /
+Top / Bottom / Isometric** (sets the camera's sight and up vectors, then
+reframes), or **Normal to Face** — select a planar face first and the
+camera turns square onto it, keeping the current zoom.
 
 ## Setup
 

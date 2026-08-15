@@ -1,9 +1,7 @@
 """CatPad — frameless Apple-style macro pad (pywebview + WebView2 shell)
 driving the running 3DEXPERIENCE session. Add a macro to MACROS and, if it
 needs a new icon, an entry in ICONS inside ui/index.html. A macro with an
-"options" list gets a chooser sheet; one with a "toggles" list renders as
-a double-width card of side-by-side on/off segments. Either way its run()
-takes (log, option_key)."""
+"options" list gets a chooser sheet and its run() takes (log, option_key)."""
 import ctypes
 import json
 import sys
@@ -14,7 +12,8 @@ from pathlib import Path
 import webview
 
 from catia_pad import __author__, __version__
-from catia_pad.macros import camera_lens, color_bodies, toggle_visibility
+from catia_pad.macros import (camera_lens, color_bodies, color_hierarchy,
+                              reset_colors, std_views)
 
 MACROS = [
     {
@@ -24,7 +23,25 @@ MACROS = [
         "tip": ("Color everything under your CATIA selection with muted hues "
                 "that follow the tree: distinct per component, tone-varied "
                 "within a geoset. Lightweight components are loaded first."),
+        "fn": color_hierarchy.run,
+    },
+    {
+        "key": "color_bodies",
+        "icon": "swatch",
+        "label": "Color<br>Bodies",
+        "tip": ("A clearly different flat color for every body/geoset "
+                "across all visible parts — muted, well spread, never "
+                "going inside geosets."),
         "fn": color_bodies.run,
+    },
+    {
+        "key": "reset_colors",
+        "icon": "reset",
+        "label": "Reset<br>Colors",
+        "tip": ("Give every visible item its inherited color back — undoes "
+                "what the color cards (or anyone else) painted. Hidden "
+                "items are left alone."),
+        "fn": reset_colors.run,
     },
     {
         "key": "camera_lens",
@@ -37,10 +54,14 @@ MACROS = [
         "sheet_title": "Lens for this view",
     },
     {
-        "key": "toggle_visibility",
-        "wide": True,
-        "toggles": toggle_visibility.TOGGLES,
-        "fn": toggle_visibility.run,
+        "key": "std_views",
+        "icon": "cube",
+        "label": "Std<br>Views",
+        "tip": ("Snap the 3D view to a standard orientation — front, top, "
+                "side… — or square onto the selected planar face."),
+        "fn": std_views.run,
+        "options": std_views.OPTIONS,
+        "sheet_title": "Point the camera",
     },
 ]
 
@@ -62,8 +83,9 @@ class _CompositionData(ctypes.Structure):
 
 
 def _dress_window(title):
-    """Rounded corners + blur behind the transparent panel. Best-effort —
-    silently skipped on systems that refuse any given step."""
+    """Rounded corners, blur behind the transparent panel, and the 🐈
+    taskbar icon. Best-effort — silently skipped on systems that refuse
+    any given step."""
     try:
         user32 = ctypes.windll.user32
         hwnd = 0
@@ -83,6 +105,13 @@ def _dress_window(title):
                                 ctypes.addressof(accent),
                                 ctypes.sizeof(accent))
         user32.SetWindowCompositionAttribute(hwnd, ctypes.byref(data))
+        icon = _asset_path("catpad.ico")
+        if icon.exists():
+            hicon = user32.LoadImageW(
+                None, str(icon), 1, 0, 0, 0x10)  # IMAGE_ICON, LOADFROMFILE
+            if hicon:
+                for which in (0, 1):  # ICON_SMALL, ICON_BIG
+                    user32.SendMessageW(hwnd, 0x80, which, hicon)
     except Exception:
         pass
 
@@ -91,6 +120,11 @@ def _ui_path():
     """ui/index.html next to the source, or bundled inside the frozen app."""
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     return base / "ui" / "index.html"
+
+
+def _asset_path(name):
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return base / "assets" / name
 
 
 class Api:
@@ -107,7 +141,7 @@ class Api:
             "slots": TOTAL_SLOTS,
             "macros": [{k: m.get(k) for k in
                         ("key", "icon", "label", "tip", "options",
-                         "sheet_title", "wide", "toggles")}
+                         "sheet_title")}
                        for m in MACROS],
         }
 
@@ -127,16 +161,16 @@ class Api:
         self._busy = True
         self._push("CatPad.setBusy(true)")
         try:
-            if macro.get("options") or macro.get("toggles"):
-                msg = macro["fn"](self.set_status, option)
+            if macro.get("options"):
+                result = macro["fn"](self.set_status, option)
             else:
-                msg = macro["fn"](self.set_status)
+                result = macro["fn"](self.set_status)
         except Exception as exc:
-            msg = f"Error: {exc}"
+            result = f"Error: {exc}"
         finally:
             self._busy = False
             self._push("CatPad.setBusy(false)")
-        self.set_status(msg)
+        self.set_status(result)
 
     def minimize(self):
         self._window.minimize()

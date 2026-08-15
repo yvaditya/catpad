@@ -4,9 +4,9 @@ field of view matches a full-frame photo lens (vertical FOV = 2·atan(12/f),
 import math
 
 import pythoncom
-from win32com.client import VARIANT
 
 from ..connection import connect
+from ..viewpoint import get_triplet, put_triplet
 
 OPTIONS = [
     {"key": "ortho", "label": "Orthographic", "hint": "parallel, no FOV"},
@@ -21,14 +21,7 @@ OPTIONS = [
 PERSPECTIVE, PARALLEL = 0, 1
 
 
-def _triplet(viewpoint, getter):
-    arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8 | pythoncom.VT_BYREF,
-                  [0.0, 0.0, 0.0])
-    getattr(viewpoint, getter)(arr)
-    return list(arr.value)
-
-
-def _keep_subject_size(viewpoint, half_new_deg):
+def _keep_subject_size(catia, viewpoint, half_new_deg):
     """Dolly the camera along its sight line so the model keeps its
     apparent size while the lens (FOV) changes — only meaningful when the
     view is already perspective."""
@@ -36,8 +29,8 @@ def _keep_subject_size(viewpoint, half_new_deg):
     half_new = math.radians(half_new_deg)
     if half_old <= 0 or abs(half_old - half_new) < 1e-9:
         return False
-    origin = _triplet(viewpoint, "GetOrigin")
-    sight = _triplet(viewpoint, "GetSightDirection")
+    origin = get_triplet(catia, "GetOrigin")
+    sight = get_triplet(catia, "GetSightDirection")
     norm = math.sqrt(sum(c * c for c in sight))
     if norm < 1e-12:
         return False
@@ -48,8 +41,7 @@ def _keep_subject_size(viewpoint, half_new_deg):
     target = [o + s * d_old for o, s in zip(origin, sight)]
     d_new = d_old * math.tan(half_old) / math.tan(half_new)
     new_origin = [t - s * d_new for t, s in zip(target, sight)]
-    viewpoint.PutOrigin(
-        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, new_origin))
+    put_triplet(viewpoint, "PutOrigin", new_origin)
     viewpoint.FocusDistance = d_new
     return True
 
@@ -77,7 +69,7 @@ def run(log, option="ortho"):
             dollied = False
             try:
                 if viewpoint.ProjectionMode == PERSPECTIVE:
-                    dollied = _keep_subject_size(viewpoint, half_fov)
+                    dollied = _keep_subject_size(catia, viewpoint, half_fov)
             except Exception:
                 dollied = False
             try:

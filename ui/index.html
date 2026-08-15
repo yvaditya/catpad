@@ -32,6 +32,7 @@
     animation: rise .3s ease both;
   }
   .drag { flex: 1; display: flex; align-items: center; height: 20px; }
+  .logo { font-size: 13px; margin-right: 6px; }
   .title { font-size: 11.5px; font-weight: 600; letter-spacing: -.1px; }
   .dots { display: flex; gap: 6px; padding-left: 8px; }
   .dot {
@@ -78,26 +79,6 @@
     text-align: center; line-height: 1.25; color: var(--ink);
   }
 
-  /* double-width card: side-by-side visibility toggle segments */
-  .card.wide {
-    grid-column: span 2;
-    flex-direction: row; align-items: stretch; gap: 0;
-    overflow: hidden; cursor: default;
-  }
-  .card.wide:active { transform: none; }
-  .seg {
-    flex: 1 1 0; min-width: 0;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 4px;
-    cursor: pointer; transition: background .1s;
-  }
-  .seg + .seg { border-left: 1px solid var(--line); }
-  .seg:hover { background: rgba(0, 0, 0, .05); }
-  .seg:active { background: rgba(0, 0, 0, .09); }
-  .seg svg { width: 17px; height: 17px; }
-  .seg .label { font-size: 9.5px; }
-  .seg.off svg, .seg.off .label { opacity: .28; }
-  .seg.off .label { text-decoration: line-through; }
   .slot {
     border: 1px dashed rgba(0, 0, 0, .17);
     border-radius: 11px; height: 66px;
@@ -114,7 +95,9 @@
   #status {
     font-size: 10.5px; line-height: 1.35; color: var(--ink);
     overflow-wrap: anywhere;
+    transition: opacity .6s ease;
   }
+  #status.fade { opacity: 0; }
   #working { display: none; }
   body.busy #working { display: inline-flex; gap: 2px; }
   #working i {
@@ -190,7 +173,7 @@
 </head>
 <body>
   <header>
-    <div class="drag pywebview-drag-region"><span class="title">CatPad</span></div>
+    <div class="drag pywebview-drag-region"><span class="logo">🐈</span><span class="title">CatPad</span></div>
     <div class="dots">
       <span class="dot min" id="btnMin">–</span>
       <span class="dot close" id="btnClose">✕</span>
@@ -223,22 +206,19 @@
       '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 ' +
       '0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>' +
       '<circle cx="12" cy="13" r="3"/></svg>',
-    line: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" ' +
+    swatch: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" ' +
       'stroke-linecap="round" stroke-linejoin="round">' +
-      '<line x1="6" y1="18" x2="18" y2="6"/>' +
-      '<circle cx="5" cy="19" r="1.1" fill="currentColor" stroke="none"/>' +
-      '<circle cx="19" cy="5" r="1.1" fill="currentColor" stroke="none"/></svg>',
-    plane: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" ' +
+      '<rect x="8" y="3.5" width="8" height="8" rx="2"/>' +
+      '<rect x="3.5" y="12.5" width="8" height="8" rx="2"/>' +
+      '<rect x="12.5" y="12.5" width="8" height="8" rx="2"/></svg>',
+    reset: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" ' +
       'stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M3.5 17.5 9 6.5h11.5L15 17.5H3.5z"/></svg>',
-    axis: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" ' +
+      '<polyline points="3.5 4.5 3.5 9.5 8.5 9.5"/>' +
+      '<path d="M5.6 14.8a7.3 7.3 0 1 0 1.6-7.9L3.5 9.5"/></svg>',
+    cube: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" ' +
       'stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M5 19V6M5 19h13M5 19l8.5-8.5"/>' +
-      '<path d="M3.4 7.6 5 5.4l1.6 2.2M16.4 17.4l2.2 1.6-2.2 1.6"/></svg>',
-    point: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" ' +
-      'stroke-linecap="round" stroke-linejoin="round">' +
-      '<circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>' +
-      '<path d="M12 5V7.5M12 16.5V19M5 12h2.5M16.5 12H19"/></svg>',
+      '<path d="M12 3l8 4.6v8.8L12 21l-8-4.6V7.6L12 3z"/>' +
+      '<path d="M12 12l8-4.4M12 12v9M12 12L4 7.6"/></svg>',
   };
   const SLOT_TIP = 'Free slot — a future macro lands here.';
 
@@ -261,8 +241,17 @@
       el.addEventListener(ev, () => { clearTimeout(tipTimer); tip.classList.remove('show'); }));
   }
 
+  // each status message lingers 30 s after the last update, then fades out
+  const STATUS_TTL = 30000;
+  let statusTimer = null;
   window.CatPad = {
-    setStatus(text) { document.getElementById('status').textContent = text; },
+    setStatus(text) {
+      const el = document.getElementById('status');
+      clearTimeout(statusTimer);
+      el.classList.remove('fade');
+      el.textContent = text;
+      if (text) statusTimer = setTimeout(() => el.classList.add('fade'), STATUS_TTL);
+    },
     setBusy(on) { document.body.classList.toggle('busy', on); },
   };
 
@@ -291,24 +280,6 @@
   }
   document.getElementById('overlay').addEventListener('click', closeSheet);
 
-  function toggleCard(m) {
-    const el = document.createElement('div');
-    el.className = 'card wide';
-    m.toggles.forEach(t => {
-      const seg = document.createElement('div');
-      seg.className = 'seg';
-      seg.innerHTML = (ICONS[t.icon] || '') +
-        '<div class="label">' + t.label + '</div>';
-      seg.addEventListener('click', () => {
-        const off = seg.classList.toggle('off');
-        pywebview.api.run_macro(m.key, t.key + ':' + (off ? 'hide' : 'show'));
-      });
-      tipBind(seg, t.tip);
-      el.appendChild(seg);
-    });
-    return el;
-  }
-
   function render(meta) {
     const grid = document.getElementById('grid');
     grid.innerHTML = '';
@@ -318,19 +289,14 @@
       grid.appendChild(el);
     };
     meta.macros.forEach(m => {
-      let el;
-      if (m.toggles) {
-        el = toggleCard(m);
-      } else {
-        el = document.createElement('div');
-        el.className = 'card';
-        el.innerHTML = (ICONS[m.icon] || '') +
-          '<div class="label">' + m.label + '</div>';
-        el.addEventListener('click', () => m.options
-          ? openSheet(m) : pywebview.api.run_macro(m.key));
-        tipBind(el, m.tip);
-      }
-      cells += m.wide ? 2 : 1;
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.innerHTML = (ICONS[m.icon] || '') +
+        '<div class="label">' + m.label + '</div>';
+      el.addEventListener('click', () => m.options
+        ? openSheet(m) : pywebview.api.run_macro(m.key));
+      tipBind(el, m.tip);
+      cells++;
       place(el);
     });
     for (; cells < meta.slots; cells++) {
